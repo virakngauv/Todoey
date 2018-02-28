@@ -8,14 +8,17 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class CategoryViewController: UITableViewController {
+
+class CategoryViewController: SwipeTableViewController {
     let realm = try! Realm()
     var categories : Results<Category>?
     
     override func viewDidLoad() {
         super.viewDidLoad()
         loadCategories()
+        tableView.separatorStyle = .none
     }
     
     
@@ -27,9 +30,9 @@ class CategoryViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         cell.textLabel?.text = categories?[indexPath.row].name ?? "No Categories Added Yet"
-        
+        cell.backgroundColor = UIColor.init(hexString: (categories?[indexPath.row].bgColor)!)
         return cell
     }
     
@@ -60,7 +63,16 @@ class CategoryViewController: UITableViewController {
     
     func loadCategories() {
         categories = realm.objects(Category.self)
+        
         tableView.reloadData()
+    }
+    
+    //Delete data
+    override func updateModel(at indexPath: IndexPath) {
+        if let swipedCell = self.categories?[indexPath.row] {
+            do {try self.realm.write { self.realm.delete(swipedCell)}}
+            catch {print("Error deleting cell, \(error)")}
+        }
     }
     
     
@@ -72,6 +84,8 @@ class CategoryViewController: UITableViewController {
         let action = UIAlertAction(title: "Add Category", style: .default){(action) in
             let newCategory = Category()
             newCategory.name = textField.text!
+            newCategory.bgColor = UIColor.randomFlat.hexValue()
+            print(newCategory.bgColor)
             
             self.saveCategories(category: newCategory)
         }
@@ -87,5 +101,4 @@ class CategoryViewController: UITableViewController {
         
         present(alert, animated: true, completion: nil)
     }
-    
 }

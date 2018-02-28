@@ -10,28 +10,27 @@ import UIKit
 import RealmSwift
 
 
-class TodoListViewController: UITableViewController {
-    var todoItems : Results<Item>?
+class TodoListViewController: SwipeTableViewController {
     let realm = try! Realm()
+    var todoItems : Results<Item>?
     var selectedCategory : Category?{didSet{loadItems()}}
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        tableView.reloadData()
+        loadItems()
 }
 
     
     
     //MARK: TableView Datasource Methods
-    //How cells are loaded and displayed
+    //(Gets called when tableView.reloadData() is run)
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        print(todoItems?.count ?? 1)
         return todoItems?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         if let item = todoItems?[indexPath.row] {
             cell.textLabel?.text = item.title
             cell.accessoryType = item.done ? .checkmark : .none
@@ -45,10 +44,11 @@ class TodoListViewController: UITableViewController {
     
     
     //MARK: TableView Delegate Methods
-    //Allows user to check and uncheck task
+    
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
+        //Allows user to check and uncheck task
         if let item = todoItems?[indexPath.row] {
             do {
                 try realm.write {
@@ -64,6 +64,30 @@ class TodoListViewController: UITableViewController {
 
     
     
+    //MARK: Data Manipulation Methods
+    func saveItems(_ item : Item, in category : Category) {
+        do {try self.realm.write {category.items.append(item)}}
+        catch {print("Error trying to save item, \(error)")}
+        
+        loadItems()
+    }
+    
+    func loadItems() {
+        todoItems = selectedCategory?.items.sorted(byKeyPath: "dateCreated", ascending: false)
+        
+        tableView.reloadData()
+    }
+    
+    //Delete data
+    override func updateModel(at indexPath: IndexPath) {
+        if let swipedCell = self.todoItems?[indexPath.row] {
+            do {try self.realm.write { self.realm.delete(swipedCell)}}
+            catch {print("Error deleting cell, \(error)")}
+        }
+    }
+    
+    
+    
     //MARK: Add new tasks to todo list
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         var textField = UITextField()
@@ -71,18 +95,12 @@ class TodoListViewController: UITableViewController {
         //Action that gets triggered when user "Adds Item"
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             if let currentCategory = self.selectedCategory {
-                do {
-                    try self.realm.write {
-                        let item = Item()
-                        item.title = textField.text!
-                        item.dateCreated = Date()
-                        currentCategory.items.append(item)
-                    }
-                }
-                catch {print("Error trying to save item, \(error)")}
+                let item = Item()
+                item.title = textField.text!
+                item.dateCreated = Date()
+                
+                self.saveItems(item, in: currentCategory)
             }
-            
-            self.loadItems()
         }
         
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
@@ -94,17 +112,7 @@ class TodoListViewController: UITableViewController {
         
         alert.addAction(action)
         
-        //Show completed alert
         present(alert, animated: true, completion: nil)
-    }
-    
-    
-    
-    //MARK: Model Manipulation Methods
-    func loadItems() {
-        todoItems = selectedCategory?.items.sorted(byKeyPath: "dateCreated", ascending: false)
-
-        tableView.reloadData()
     }
     
 
