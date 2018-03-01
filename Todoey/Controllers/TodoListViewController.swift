@@ -8,6 +8,7 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
 
 class TodoListViewController: SwipeTableViewController {
@@ -15,12 +16,42 @@ class TodoListViewController: SwipeTableViewController {
     var todoItems : Results<Item>?
     var selectedCategory : Category?{didSet{loadItems()}}
     
+    @IBOutlet weak var searchBar: UISearchBar!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         loadItems()
-}
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        title = selectedCategory?.name
+        
+        guard let colorHex = selectedCategory?.bgColor else { fatalError() }
 
+        updateNavBar(withHexCode: colorHex)
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        updateNavBar(withHexCode: "1D9BF6")
+    }
+
+    
+    
+    //MARK: - Nav Bar Setup Methods
+    
+    func updateNavBar(withHexCode colorHexCode : String){
+        guard let navBar = navigationController?.navigationBar else {fatalError("Navigation controller does not exist (like the limit).")}
+        
+        guard let navBarColor = UIColor.init(hexString: colorHexCode)  else {fatalError()}
+        
+        navBar.barTintColor = navBarColor
+        
+        navBar.tintColor = ContrastColorOf(navBarColor, returnFlat: true)
+        
+        navBar.largeTitleTextAttributes = [NSAttributedStringKey.foregroundColor : ContrastColorOf(navBarColor, returnFlat: true)]
+        
+        searchBar.barTintColor = navBarColor
+    }
     
     
     //MARK: TableView Datasource Methods
@@ -33,10 +64,10 @@ class TodoListViewController: SwipeTableViewController {
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
         if let item = todoItems?[indexPath.row] {
             cell.textLabel?.text = item.title
+            cell.backgroundColor = UIColor.init(hexString: selectedCategory!.bgColor)?.darken(byPercentage: CGFloat(indexPath.row)/CGFloat(todoItems!.count))
+            cell.textLabel?.textColor = ContrastColorOf(cell.backgroundColor!, returnFlat: true)
             cell.accessoryType = item.done ? .checkmark : .none
-        } else {
-            cell.textLabel?.text = "No Items Added"
-        }
+        } else {cell.textLabel?.text = "No Items Added"}
     
         return cell
     }
@@ -50,13 +81,8 @@ class TodoListViewController: SwipeTableViewController {
         
         //Allows user to check and uncheck task
         if let item = todoItems?[indexPath.row] {
-            do {
-                try realm.write {
-                    item.done = !item.done
-                }
-            } catch {
-                print("Error saving done status, \(error)")
-            }
+            do {try realm.write {item.done = !item.done}}
+            catch {print("Error saving done status, \(error)")}
         }
         
         tableView.reloadData()
